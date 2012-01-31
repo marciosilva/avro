@@ -25,19 +25,19 @@ SCHEMAS_TO_VALIDATE = (
   ('"string"', unicode('adsfasdf09809dsf-=adsf')),
   ('"bytes"', '12345abcd'),
   ('"int"', 1234),
-  ('"long"', 1234),
+  ('"long"', 1234L),
   ('"float"', 1234.0),
   ('"double"', 1234.0),
   ('{"type": "fixed", "name": "Test", "size": 1}', 'B'),
   ('{"type": "enum", "name": "Test", "symbols": ["A", "B"]}', 'B'),
-  ('{"type": "array", "items": "long"}', [1, 3, 2]),
-  ('{"type": "map", "values": "long"}', {'a': 1, 'b': 3, 'c': 2}),
+  ('{"type": "array", "items": "long"}', [1L, 3L, 2L]),
+  ('{"type": "map", "values": "long"}', {'a': 1L, 'b': 3L, 'c': 2L}),
   ('["string", "null", "long"]', None),
   ("""\
    {"type": "record",
     "name": "Test",
     "fields": [{"name": "f", "type": "long"}]}
-   """, {'f': 5}),
+   """, {'f': 5L}),
   ("""\
    {"type": "record",
     "name": "Lisp",
@@ -76,6 +76,7 @@ class TestDataFile(unittest.TestCase):
         print ''
         print 'Schema: %s' % example_schema
         print 'Datum: %s' % datum
+        print 'Datum Type: %s' % type(datum)
         print 'Codec: %s' % codec
 
         # write data in binary to file 10 times
@@ -92,8 +93,8 @@ class TestDataFile(unittest.TestCase):
         datum_reader = io.DatumReader()
         dfr = datafile.DataFileReader(reader, datum_reader)
         round_trip_data = []
-        for datum in dfr:
-          round_trip_data.append(datum)
+        for datum_read in dfr:
+          round_trip_data.append(datum_read)
 
         print 'Round Trip Data: %s' % round_trip_data
         print 'Round Trip Data Length: %d' % len(round_trip_data)
@@ -147,8 +148,8 @@ class TestDataFile(unittest.TestCase):
         datum_reader = io.DatumReader()
         dfr = datafile.DataFileReader(reader, datum_reader)
         appended_data = []
-        for datum in dfr:
-          appended_data.append(datum)
+        for datum_read in dfr:
+          appended_data.append(datum_read)
 
         print 'Appended Data: %s' % appended_data
         print 'Appended Data Length: %d' % len(appended_data)
