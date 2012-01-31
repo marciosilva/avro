@@ -28,19 +28,19 @@ SCHEMAS_TO_VALIDATE = (
   ('"string"', unicode('adsfasdf09809dsf-=adsf')),
   ('"bytes"', '12345abcd'),
   ('"int"', 1234),
-  ('"long"', 1234),
+  ('"long"', 1234L),
   ('"float"', 1234.0),
   ('"double"', 1234.0),
   ('{"type": "fixed", "name": "Test", "size": 1}', 'B'),
   ('{"type": "enum", "name": "Test", "symbols": ["A", "B"]}', 'B'),
-  ('{"type": "array", "items": "long"}', [1, 3, 2]),
-  ('{"type": "map", "values": "long"}', {'a': 1, 'b': 3, 'c': 2}),
+  ('{"type": "array", "items": "long"}', [1L, 3L, 2L]),
+  ('{"type": "map", "values": "long"}', {'a': 1L, 'b': 3L, 'c': 2L}),
   ('["string", "null", "long"]', None),
   ("""\
    {"type": "record",
     "name": "Test",
     "fields": [{"name": "f", "type": "long"}]}
-   """, {'f': 5}),
+   """, {'f': 5L}),
   ("""\
    {"type": "record",
     "name": "Lisp",
@@ -128,7 +128,10 @@ def read_datum(buffer, writers_schema, readers_schema=None):
 def check_binary_encoding(number_type):
   print_test_name('TEST BINARY %s ENCODING' % number_type.upper())
   correct = 0
-  for datum, hex_encoding in BINARY_ENCODINGS:
+  # get function to convert datum to appropriate type
+  typecaster = eval(number_type)
+  for int_val, hex_encoding in BINARY_ENCODINGS:
+    datum = typecaster(int_val)
     print 'Datum: %d' % datum
     print 'Correct Encoding: %s' % hex_encoding
 
@@ -145,8 +148,11 @@ def check_binary_encoding(number_type):
 def check_skip_number(number_type):
   print_test_name('TEST SKIP %s' % number_type.upper())
   correct = 0
-  for value_to_skip, hex_encoding in BINARY_ENCODINGS:
-    VALUE_TO_READ = 6253
+  # get function to convert datum to appropriate type
+  typecaster = eval(number_type)
+  for int_val, hex_encoding in BINARY_ENCODINGS:
+    value_to_skip = typecaster(int_val)
+    VALUE_TO_READ = typecaster(6253)
     print 'Value to Skip: %d' % value_to_skip
 
     # write the value to skip and a known value
@@ -228,10 +234,11 @@ class TestIO(unittest.TestCase):
     # note that checking writers_schema.type in read_data
     # allows us to handle promotion correctly
     promotable_schemas = ['"int"', '"long"', '"float"', '"double"']
+    datums_to_write = [ int(219), long(219), float(219), float(219) ]
     incorrect = 0
     for i, ws in enumerate(promotable_schemas):
       writers_schema = schema.parse(ws)
-      datum_to_write = 219
+      datum_to_write = datums_to_write[i]
       for rs in promotable_schemas[i + 1:]:
         readers_schema = schema.parse(rs)
         writer, enc, dw = write_datum(datum_to_write, writers_schema)
