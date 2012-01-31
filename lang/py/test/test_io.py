@@ -248,22 +248,6 @@ class TestIO(unittest.TestCase):
         if datum_read != datum_to_write: incorrect += 1
     self.assertEquals(incorrect, 0)
 
-
-  def test_union_type_preservation(self):
-      print_test_name('UNION TYPE PRESERVATION')
-      union_schemas = ['["int","long"]','["long","int"]']
-      test_datums = [ int(1),long(1) ]
-      incorrect = 0
-      for us in union_schemas:
-          writers_schema = schema.parse(us)
-          for datum in test_datums:
-              writer, enc, dw = write_datum(datum,writers_schema)
-              datum_read = read_datum(writer,writers_schema,writers_schema)
-              print 'Type Written: %s' % type(datum)
-              print 'Type Read: %s' % type(datum_read)
-              if type(datum) != type(datum_read): incorrect += 1
-      self.assertEquals(incorrect,0)
-
   def test_unknown_symbol(self):
     print_test_name('TEST UNKNOWN SYMBOL')
     writers_schema = schema.parse("""\
@@ -355,6 +339,25 @@ class TestIO(unittest.TestCase):
                   {"name": "E", "type": "int"}]}""")
     datum_to_write = {'E': 5, 'F': 'Bad'}
     self.assertRaises(io.AvroTypeException, write_datum, datum_to_write, writers_schema)
+
+  def test_union_type_preservation(self):
+    print_test_name('TEST_UNION_TYPE_PRESERVATION')
+    datums_to_write = [ float(1), int(1), long(1) ]
+    base_types = ['long','int','float']
+    incorrect = 0
+    for p in  permutations(base_types):
+      schema_s = '[ "%s", "%s", "%s" ]' % p
+      print "Schema: '%s'" % schema_s
+      union_s = schema.parse(schema_s)
+      for d in datums_to_write:
+        buff,encoder,datum_writer = write_datum(d,union_s)
+        datum_read = read_datum(buff,union_s)
+        t_expected = type(d)
+        t_read = type(datum_read)
+        print '\tExpected "%s", Read "%s"' % (t_expected,t_read)
+        if(t_expected != t_read):
+          incorrect += 1
+    self.assertEquals(incorrect,0)
 
 if __name__ == '__main__':
   unittest.main()
