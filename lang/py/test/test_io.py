@@ -29,19 +29,19 @@ SCHEMAS_TO_VALIDATE = (
   ('"string"', unicode('adsfasdf09809dsf-=adsf')),
   ('"bytes"', '12345abcd'),
   ('"int"', 1234),
-  ('"long"', 1234L),
+  ('"long"', 1234),
   ('"float"', 1234.0),
   ('"double"', 1234.0),
   ('{"type": "fixed", "name": "Test", "size": 1}', 'B'),
   ('{"type": "enum", "name": "Test", "symbols": ["A", "B"]}', 'B'),
-  ('{"type": "array", "items": "long"}', [1L, 3L, 2L]),
-  ('{"type": "map", "values": "long"}', {'a': 1L, 'b': 3L, 'c': 2L}),
+  ('{"type": "array", "items": "long"}', [1, 3, 2]),
+  ('{"type": "map", "values": "long"}', {'a': 1, 'b': 3, 'c': 2}),
   ('["string", "null", "long"]', None),
   ("""\
    {"type": "record",
     "name": "Test",
     "fields": [{"name": "f", "type": "long"}]}
-   """, {'f': 5L}),
+   """, {'f': 5}),
   ("""\
    {"type": "record",
     "name": "Lisp",
@@ -72,7 +72,7 @@ DEFAULT_VALUE_EXAMPLES = (
   ('"string"', '"foo"', u'foo'),
   ('"bytes"', '"\u00FF\u00FF"', u'\xff\xff'),
   ('"int"', '5', 5),
-  ('"long"', '5', 5L),
+  ('"long"', '5', 5),
   ('"float"', '1.1', 1.1),
   ('"double"', '1.1', 1.1),
   ('{"type": "fixed", "name": "F", "size": 2}', '"\u00FF\u00FF"', u'\xff\xff'),
@@ -352,11 +352,11 @@ class TestIO(unittest.TestCase):
       union_s = schema.parse(schema_s)
       for d in datums_to_write:
         buff,encoder,datum_writer = write_datum(d,union_s)
-        datum_read = read_datum(buff,union_s)
-        t_expected = type(d)
-        t_read = type(datum_read)
-        print '\tExpected "%s", Read "%s"' % (t_expected,t_read)
-        if(t_expected != t_read):
+        idx_expected = p.index(type(d).__name__)
+        reader = StringIO(buff.getvalue())
+        idx_read = io.BinaryDecoder(reader).read_long() 
+        print '\tWrote %s, expected index "%s", read "%s"' % (type(d),idx_expected,idx_read)
+        if(idx_expected != idx_read):
           incorrect += 1
     self.assertEquals(incorrect,0)
 

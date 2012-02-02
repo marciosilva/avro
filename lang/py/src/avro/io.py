@@ -98,7 +98,7 @@ class SchemaResolutionException(schema.AvroException):
 # Validate
 #
 
-def validate(expected_schema, datum):
+def validate(expected_schema, datum,strict=False):
   """Determine if a python datum is an instance of a schema."""
   schema_type = expected_schema.type
   if schema_type == 'null':
@@ -110,11 +110,17 @@ def validate(expected_schema, datum):
   elif schema_type == 'bytes':
     return isinstance(datum, str)
   elif schema_type == 'int':
-    return isinstance(datum, int)
-  elif schema_type == 'long':
-    return isinstance(datum, long)
+    return ((INT_MIN_VALUE <= datum <= INT_MAX_VALUE) 
+            and (isinstance(datum, int) 
+                 or (not strict and isinstance(datum,long))))
+  elif (schema_type == 'long'):
+    return (LONG_MIN_VALUE <= datum <= LONG_MAX_VALUE 
+            and (isinstance(datum, long) 
+                 or (not strict and isinstance(datum,int))))
   elif schema_type in ['float', 'double']:
-    return isinstance(datum, float)
+    return (isinstance(datum, float) 
+            or (not strict and (isinstance(datum,long) 
+                                or isinstance(datum,int))))
   elif schema_type == 'fixed':
     return isinstance(datum, str) and len(datum) == expected_schema.size
   elif schema_type == 'enum':
@@ -128,7 +134,7 @@ def validate(expected_schema, datum):
       False not in
         [validate(expected_schema.values, v) for v in datum.values()])
   elif schema_type in ['union', 'error_union']:
-    return True in [validate(s, datum) for s in expected_schema.schemas]
+    return True in [validate(s, datum,False) for s in expected_schema.schemas]
   elif schema_type in ['record', 'error', 'request']:
     return (isinstance(datum, dict) and
       False not in
@@ -866,10 +872,16 @@ class DatumWriter(object):
     The value is then encoded per the indicated schema within the union.
     """
     # resolve union
-    index_of_schema = -1
+    index_of_schema, index_of_schema_loose = -1, -1
     for i, candidate_schema in enumerate(writers_schema.schemas):
-      if validate(candidate_schema, datum):
+      if validate(candidate_schema, datum,True):
         index_of_schema = i
+        break
+      if validate(candidate_schema, datum,False):
+        index_of_schema_loose = i
+ 
+    if index_of_schema < 0:
+      index_of_schema = index_of_schema_loose
     if index_of_schema < 0: raise AvroTypeException(writers_schema, datum)
 
     # write data
