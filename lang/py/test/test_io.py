@@ -72,7 +72,7 @@ DEFAULT_VALUE_EXAMPLES = (
   ('"string"', '"foo"', u'foo'),
   ('"bytes"', '"\u00FF\u00FF"', u'\xff\xff'),
   ('"int"', '5', 5),
-  ('"long"', '5', 5),
+  ('"long"', '5', 5L),
   ('"float"', '1.1', 1.1),
   ('"double"', '1.1', 1.1),
   ('{"type": "fixed", "name": "F", "size": 2}', '"\u00FF\u00FF"', u'\xff\xff'),
@@ -129,10 +129,7 @@ def read_datum(buffer, writers_schema, readers_schema=None):
 def check_binary_encoding(number_type):
   print_test_name('TEST BINARY %s ENCODING' % number_type.upper())
   correct = 0
-  # get function to convert datum to appropriate type
-  typecaster = eval(number_type)
-  for int_val, hex_encoding in BINARY_ENCODINGS:
-    datum = typecaster(int_val)
+  for datum, hex_encoding in BINARY_ENCODINGS:
     print 'Datum: %d' % datum
     print 'Correct Encoding: %s' % hex_encoding
 
@@ -149,11 +146,8 @@ def check_binary_encoding(number_type):
 def check_skip_number(number_type):
   print_test_name('TEST SKIP %s' % number_type.upper())
   correct = 0
-  # get function to convert datum to appropriate type
-  typecaster = eval(number_type)
-  for int_val, hex_encoding in BINARY_ENCODINGS:
-    value_to_skip = typecaster(int_val)
-    VALUE_TO_READ = typecaster(6253)
+  for value_to_skip, hex_encoding in BINARY_ENCODINGS:
+    VALUE_TO_READ = 6253
     print 'Value to Skip: %d' % value_to_skip
 
     # write the value to skip and a known value
@@ -235,11 +229,10 @@ class TestIO(unittest.TestCase):
     # note that checking writers_schema.type in read_data
     # allows us to handle promotion correctly
     promotable_schemas = ['"int"', '"long"', '"float"', '"double"']
-    datums_to_write = [ int(219), long(219), float(219), float(219) ]
     incorrect = 0
     for i, ws in enumerate(promotable_schemas):
       writers_schema = schema.parse(ws)
-      datum_to_write = datums_to_write[i]
+      datum_to_write = 219
       for rs in promotable_schemas[i + 1:]:
         readers_schema = schema.parse(rs)
         writer, enc, dw = write_datum(datum_to_write, writers_schema)
