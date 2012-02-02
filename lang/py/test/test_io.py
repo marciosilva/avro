@@ -21,6 +21,7 @@ except ImportError:
 from binascii import hexlify
 from avro import schema
 from avro import io
+from itertools import permutations
 
 SCHEMAS_TO_VALIDATE = (
   ('"null"', None),
