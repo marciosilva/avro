@@ -77,6 +77,7 @@ RESERVED_PROPS = (
   'size',       # Fixed
   'symbols',    # Enum
   'values',     # Map
+  'doc',
 )
 
 VALID_FIELD_SORT_ORDERS = (
@@ -283,7 +284,7 @@ class NamedSchema(Schema):
   fullname = property(lambda self: self._fullname)
 
 class Field(object):
-  def __init__(self, type, name, has_default, default=None, order=None, names=None):
+  def __init__(self, type, name, has_default, default=None, order=None,names=None, doc=None):
     # Ensure valid ctor args
     if not name:
       fail_msg = 'Fields must have a non-empty name.'
@@ -315,11 +316,13 @@ class Field(object):
     # TODO(hammer): check to ensure default is valid
     if has_default: self.set_prop('default', default)
     if order is not None: self.set_prop('order', order)
+    if doc is not None: self.set_prop('doc', doc)
 
   # read-only properties
   default = property(lambda self: self.get_prop('default'))
   has_default = property(lambda self: self._has_default)
   order = property(lambda self: self.get_prop('order'))
+  doc = property(lambda self: self.get_prop('doc'))
   props = property(lambda self: self._props)
 
   # utility functions to manipulate properties dict
@@ -392,7 +395,7 @@ class FixedSchema(NamedSchema):
     return self.props == that.props
 
 class EnumSchema(NamedSchema):
-  def __init__(self, name, namespace, symbols, names=None):
+  def __init__(self, name, namespace, symbols, names=None, doc=None):
     # Ensure valid ctor args
     if not isinstance(symbols, list):
       fail_msg = 'Enum Schema requires a JSON array for the symbols property.'
@@ -409,9 +412,11 @@ class EnumSchema(NamedSchema):
 
     # Add class members
     self.set_prop('symbols', symbols)
+    if doc is not None: self.set_prop('doc', doc)
 
   # read-only properties
   symbols = property(lambda self: self.get_prop('symbols'))
+  doc = property(lambda self: self.get_prop('doc'))
 
   def to_json(self, names):
     if self.fullname in names.names:
@@ -564,7 +569,8 @@ class RecordSchema(NamedSchema):
           default = field.get('default')
 
         order = field.get('order')
-        new_field = Field(type, name, has_default, default, order, names)
+        doc = field.get('doc')
+        new_field = Field(type, name, has_default, default, order, names, doc)
         # make sure field name has not been used yet
         if new_field.name in field_names:
           fail_msg = 'Field name %s already in use.' % new_field.name
@@ -575,7 +581,7 @@ class RecordSchema(NamedSchema):
       field_objects.append(new_field)
     return field_objects
 
-  def __init__(self, name, namespace, fields, names=None, schema_type='record'):
+  def __init__(self, name, namespace, fields, names=None, schema_type='record', doc=None):
     # Ensure valid ctor args
     if fields is None:
       fail_msg = 'Record schema requires a non-empty fields property.'
@@ -598,12 +604,14 @@ class RecordSchema(NamedSchema):
     # Add class members
     field_objects = RecordSchema.make_field_objects(fields, names)
     self.set_prop('fields', field_objects)
-    
+    if doc is not None: self.set_prop('doc', doc)
+
     if schema_type == 'record':
       names.default_namespace = old_default
 
   # read-only properties
   fields = property(lambda self: self.get_prop('fields'))
+  doc = property(lambda self: self.get_prop('doc'))
 
   @property
   def fields_dict(self):
@@ -657,10 +665,12 @@ def make_avsc_object(json_data, names=None):
         return FixedSchema(name, namespace, size, names)
       elif type == 'enum':
         symbols = json_data.get('symbols')
-        return EnumSchema(name, namespace, symbols, names)
+        doc = json_data.get('doc')
+        return EnumSchema(name, namespace, symbols, names, doc)
       elif type in ['record', 'error']:
         fields = json_data.get('fields')
-        return RecordSchema(name, namespace, fields, names, type)
+        doc = json_data.get('doc')
+        return RecordSchema(name, namespace, fields, names, type, doc)
       else:
         raise SchemaParseException('Unknown Named Type: %s' % type)
     elif type in VALID_TYPES:
