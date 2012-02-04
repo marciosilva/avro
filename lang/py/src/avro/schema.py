@@ -68,7 +68,7 @@ VALID_TYPES = PRIMITIVE_TYPES + NAMED_TYPES + (
   'error_union'
 )
 
-RESERVED_PROPS = (
+SCHEMA_RESERVED_PROPS = (
   'type',
   'name',
   'namespace',
@@ -78,6 +78,14 @@ RESERVED_PROPS = (
   'symbols',    # Enum
   'values',     # Map
   'doc',
+)
+
+FIELD_RESERVED_PROPS = (
+  'default',
+  'name',
+  'doc',
+  'order',
+  'type',
 )
 
 VALID_FIELD_SORT_ORDERS = (
@@ -102,7 +110,7 @@ class SchemaParseException(AvroException):
 
 class Schema(object):
   """Base class for all Schema classes."""
-  def __init__(self, type):
+  def __init__(self, type, named_props=None):
     # Ensure valid ctor args
     if not isinstance(type, basestring):
       fail_msg = 'Schema type must be a string.'
@@ -115,6 +123,7 @@ class Schema(object):
     if not hasattr(self, '_props'): self._props = {}
     self.set_prop('type', type)
     self.type = type
+    if named_props is not None: self._props.update(named_props)
 
   # Read-only properties dict. Printing schemas
   # creates JSON properties directly from this dict. 
@@ -126,6 +135,12 @@ class Schema(object):
 
   def set_prop(self, key, value):
     self._props[key] = value
+
+  def get_named_props(self):
+    """
+    Returns a dictionary of non-reserved properties 
+    """
+    return get_named_props(self._props)
 
   def __str__(self):
     names = Names()
@@ -246,7 +261,7 @@ class Names(object):
 
 class NamedSchema(Schema):
   """Named Schemas specified in NAMED_TYPES."""
-  def __init__(self, type, name, namespace=None, names=None):
+  def __init__(self, type, name, namespace=None, names=None, named_props=None):
     # Ensure valid ctor args
     if not name:
       fail_msg = 'Named Schemas must have a non-empty name.'
@@ -259,7 +274,7 @@ class NamedSchema(Schema):
       raise SchemaParseException(fail_msg)
 
     # Call parent ctor
-    Schema.__init__(self, type)
+    Schema.__init__(self, type, named_props)
 
     # Add class members
     new_name = names.add_name(name, namespace, self)
@@ -284,7 +299,8 @@ class NamedSchema(Schema):
   fullname = property(lambda self: self._fullname)
 
 class Field(object):
-  def __init__(self, type, name, has_default, default=None, order=None,names=None, doc=None):
+  def __init__(self, type, name, has_default, default=None,
+               order=None,names=None, doc=None, named_props=None):
     # Ensure valid ctor args
     if not name:
       fail_msg = 'Fields must have a non-empty name.'
@@ -299,6 +315,7 @@ class Field(object):
     # add members
     self._props = {}
     self._has_default = has_default
+    if named_props is not None: self._props.update(named_props)
 
     if (isinstance(type, basestring) and names is not None
         and names.has_name(type, None)):
@@ -369,14 +386,14 @@ class PrimitiveSchema(Schema):
 #
 
 class FixedSchema(NamedSchema):
-  def __init__(self, name, namespace, size, names=None):
+  def __init__(self, name, namespace, size, names=None, named_props=None):
     # Ensure valid ctor args
     if not isinstance(size, int):
       fail_msg = 'Fixed Schema requires a valid integer for size property.'
       raise AvroException(fail_msg)
 
     # Call parent ctor
-    NamedSchema.__init__(self, 'fixed', name, namespace, names)
+    NamedSchema.__init__(self, 'fixed', name, namespace, names, named_props)
 
     # Add class members
     self.set_prop('size', size)
@@ -395,7 +412,7 @@ class FixedSchema(NamedSchema):
     return self.props == that.props
 
 class EnumSchema(NamedSchema):
-  def __init__(self, name, namespace, symbols, names=None, doc=None):
+  def __init__(self, name, namespace, symbols, names=None, doc=None, named_props=None):
     # Ensure valid ctor args
     if not isinstance(symbols, list):
       fail_msg = 'Enum Schema requires a JSON array for the symbols property.'
@@ -408,7 +425,7 @@ class EnumSchema(NamedSchema):
       raise AvroException(fail_msg)
 
     # Call parent ctor
-    NamedSchema.__init__(self, 'enum', name, namespace, names)
+    NamedSchema.__init__(self, 'enum', name, namespace, names, named_props)
 
     # Add class members
     self.set_prop('symbols', symbols)
@@ -433,9 +450,9 @@ class EnumSchema(NamedSchema):
 #
 
 class ArraySchema(Schema):
-  def __init__(self, items, names=None):
+  def __init__(self, items, names=None, named_props=None):
     # Call parent ctor
-    Schema.__init__(self, 'array')
+    Schema.__init__(self, 'array', named_props)
     # Add class members
 
     if isinstance(items, basestring) and names.has_name(items, None):
@@ -463,9 +480,9 @@ class ArraySchema(Schema):
     return to_cmp == json.loads(str(that))
 
 class MapSchema(Schema):
-  def __init__(self, values, names=None):
+  def __init__(self, values, names=None, named_props=None):
     # Call parent ctor
-    Schema.__init__(self, 'map')
+    Schema.__init__(self, 'map',named_props)
 
     # Add class members
     if isinstance(values, basestring) and names.has_name(values, None):
@@ -570,7 +587,9 @@ class RecordSchema(NamedSchema):
 
         order = field.get('order')
         doc = field.get('doc')
-        new_field = Field(type, name, has_default, default, order, names, doc)
+        named_props = get_named_props(field, FIELD_RESERVED_PROPS)
+        new_field = Field(type, name, has_default, default, order, names, doc,
+                         named_props)
         # make sure field name has not been used yet
         if new_field.name in field_names:
           fail_msg = 'Field name %s already in use.' % new_field.name
@@ -581,7 +600,8 @@ class RecordSchema(NamedSchema):
       field_objects.append(new_field)
     return field_objects
 
-  def __init__(self, name, namespace, fields, names=None, schema_type='record', doc=None):
+  def __init__(self, name, namespace, fields, names=None, schema_type='record',
+               doc=None, named_props=None):
     # Ensure valid ctor args
     if fields is None:
       fail_msg = 'Record schema requires a non-empty fields property.'
@@ -592,9 +612,10 @@ class RecordSchema(NamedSchema):
 
     # Call parent ctor (adds own name to namespace, too)
     if schema_type == 'request':
-      Schema.__init__(self, schema_type)
+      Schema.__init__(self, schema_type, named_props)
     else:
-      NamedSchema.__init__(self, schema_type, name, namespace, names)
+      NamedSchema.__init__(self, schema_type, name, namespace, names,
+                           named_props)
 
     if schema_type == 'record': 
       old_default = names.default_namespace
@@ -641,8 +662,16 @@ class RecordSchema(NamedSchema):
 #
 # Module Methods
 #
+def get_named_props(all_props,reserved_props):
+  """
+  Retrieve the non-reserved properties from a dictionary of properties
+  @args reserved_props: The set of reserved properties to exclude
+  """
+  if hasattr(all_props, 'items') and callable(all_props.items):
+    return dict([(k,v) for (k,v) in all_props.items() if k not in
+                 reserved_props ])
 
-# TODO(hammer): handle non-reserved properties
+
 def make_avsc_object(json_data, names=None):
   """
   Build Avro Schema from data parsed out of JSON string.
@@ -655,6 +684,7 @@ def make_avsc_object(json_data, names=None):
   # JSON object (non-union)
   if hasattr(json_data, 'get') and callable(json_data.get):
     type = json_data.get('type')
+    named_props = get_named_props(json_data, SCHEMA_RESERVED_PROPS)
     if type in PRIMITIVE_TYPES:
       return PrimitiveSchema(type)
     elif type in NAMED_TYPES:
@@ -662,24 +692,24 @@ def make_avsc_object(json_data, names=None):
       namespace = json_data.get('namespace')
       if type == 'fixed':
         size = json_data.get('size')
-        return FixedSchema(name, namespace, size, names)
+        return FixedSchema(name, namespace, size, names, named_props)
       elif type == 'enum':
         symbols = json_data.get('symbols')
         doc = json_data.get('doc')
-        return EnumSchema(name, namespace, symbols, names, doc)
+        return EnumSchema(name, namespace, symbols, names, doc, named_props)
       elif type in ['record', 'error']:
         fields = json_data.get('fields')
         doc = json_data.get('doc')
-        return RecordSchema(name, namespace, fields, names, type, doc)
+        return RecordSchema(name, namespace, fields, names, type, doc, named_props)
       else:
         raise SchemaParseException('Unknown Named Type: %s' % type)
     elif type in VALID_TYPES:
       if type == 'array':
         items = json_data.get('items')
-        return ArraySchema(items, names)
+        return ArraySchema(items, names, named_props)
       elif type == 'map':
         values = json_data.get('values')
-        return MapSchema(values, names)
+        return MapSchema(values, names, named_props)
       elif type == 'error_union':
         declared_errors = json_data.get('declared_errors')
         return ErrorUnionSchema(declared_errors, names)
