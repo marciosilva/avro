@@ -268,6 +268,27 @@ DOC_EXAMPLES = [
     """, True),
 ]
 
+OTHER_PROP_EXAMPLES = [
+  ExampleSchema("""\
+    {"type": "record",
+     "name": "TestRecord",
+     "cp_string": "string",
+     "cp_int": 1,
+     "cp_array": [ 1, 2, 3, 4],
+     "fields": [ {"name": "f1", "type": "string", "cp_object": {"a":1,"b":2} },
+                 {"name": "f2", "type": "long", "cp_null": null} ]}
+    """, True),
+  ExampleSchema("""\
+     {"type": "map", "values": "long", "cp_boolean": true}
+    """, True),
+  ExampleSchema("""\
+    {"type": "enum",
+     "name": "TestEnum",
+     "symbols": [ "one", "two", "three" ],
+     "cp_float" : 1.0 }
+    """,True),
+]
+
 EXAMPLES = PRIMITIVE_EXAMPLES
 EXAMPLES += FIXED_EXAMPLES
 EXAMPLES += ENUM_EXAMPLES
@@ -416,7 +437,39 @@ class TestSchema(unittest.TestCase):
         for f in original_schema.fields:
           if f.doc is None:
             self.fail("Failed to preserve 'doc' in fields: " + example.schema_string)
-    self.assertEqual(correct,len(DOC_EXAMPLES)) 
-    
+    self.assertEqual(correct,len(DOC_EXAMPLES))
+
+  def test_other_attributes(self):
+    print_test_name('TEST OTHER ATTRIBUTES')
+    correct = 0
+    props = {}
+    for example in OTHER_PROP_EXAMPLES:
+      original_schema = schema.parse(example.schema_string)
+      round_trip_schema = schema.parse(str(original_schema))
+      self.assertEqual(original_schema.other_props,round_trip_schema.other_props)
+      if original_schema.type == "record":
+        field_props = 0
+        for f in original_schema.fields:
+          if f.other_props:
+            props.update(f.other_props)
+            field_props += 1
+        self.assertEqual(field_props,len(original_schema.fields))
+      if original_schema.other_props:
+        props.update(original_schema.other_props)
+        correct += 1
+    for k in props:
+      v = props[k]
+      if k == "cp_boolean":
+        self.assertEqual(type(v), bool)
+      elif k == "cp_int":
+        self.assertEqual(type(v), int)
+      elif k == "cp_object":
+        self.assertEqual(type(v), dict)
+      elif k == "cp_float":
+        self.assertEqual(type(v), float)
+      elif k == "cp_array":
+        self.assertEqual(type(v), list)
+    self.assertEqual(correct,len(OTHER_PROP_EXAMPLES))
+
 if __name__ == '__main__':
   unittest.main()
