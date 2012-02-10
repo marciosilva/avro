@@ -94,6 +94,11 @@ class SchemaResolutionException(schema.AvroException):
     if readers_schema: fail_msg += "\nReader's Schema: %s" % pretty_readers
     schema.AvroException.__init__(self, fail_msg)
 
+class double(float):
+   """
+   Marker class used to disambiguate double values.
+   """
+
 #
 # Validate
 #
@@ -117,9 +122,15 @@ def validate(expected_schema, datum,strict=False):
     return (LONG_MIN_VALUE <= datum <= LONG_MAX_VALUE 
             and (isinstance(datum, long) 
                  or (not strict and isinstance(datum,int))))
-  elif schema_type in ['float', 'double']:
-    return (isinstance(datum, float) 
-            or (not strict and (isinstance(datum,long) 
+  elif schema_type == 'float':
+    return ((isinstance(datum, float) and not isinstance(datum,double))
+            or (not strict and (isinstance(datum,double) 
+                                or isinstance(datum,long)
+                                or isinstance(datum,int))))
+  elif schema_type == 'double':
+    return (isinstance(datum, double) 
+            or (not strict and (isinstance(datum,float) 
+                                or isinstance(datum,long)
                                 or isinstance(datum,int))))
   elif schema_type == 'fixed':
     return isinstance(datum, str) and len(datum) == expected_schema.size
@@ -220,7 +231,7 @@ class BinaryDecoder(object):
       ((ord(self.read(1)) & 0xffL) << 40) |
       ((ord(self.read(1)) & 0xffL) << 48) |
       ((ord(self.read(1)) & 0xffL) << 56))
-    return STRUCT_DOUBLE.unpack(STRUCT_LONG.pack(bits))[0]
+    return double(STRUCT_DOUBLE.unpack(STRUCT_LONG.pack(bits))[0])
 
   def read_bytes(self):
     """

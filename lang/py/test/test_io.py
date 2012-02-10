@@ -22,6 +22,7 @@ from binascii import hexlify
 from avro import schema
 from avro import io
 from itertools import permutations
+from avro.io import double
 
 SCHEMAS_TO_VALIDATE = (
   ('"null"', None),
@@ -336,11 +337,11 @@ class TestIO(unittest.TestCase):
 
   def test_union_type_preservation(self):
     print_test_name('TEST_UNION_TYPE_PRESERVATION')
-    datums_to_write = [ float(1), int(1), long(1) ]
-    base_types = ['long','int','float']
+    datums_to_write = [ float(1), int(1), long(1), double(1) ]
+    base_types = ['long','int','float','double']
     incorrect = 0
     for p in  permutations(base_types):
-      schema_s = '[ "%s", "%s", "%s" ]' % p
+      schema_s = '[ "%s", "%s", "%s", "%s" ]' % p
       print "Schema: '%s'" % schema_s
       union_s = schema.parse(schema_s)
       for d in datums_to_write:
