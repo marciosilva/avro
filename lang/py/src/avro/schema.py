@@ -298,7 +298,7 @@ class NamedSchema(Schema):
 
 class Field(object):
   def __init__(self, type, name, has_default, default=None,
-               order=None,names=None, doc=None, other_props=None):
+               order=None,names=None, other_props=None):
     # Ensure valid ctor args
     if not name:
       fail_msg = 'Fields must have a non-empty name.'
@@ -331,13 +331,11 @@ class Field(object):
     # TODO(hammer): check to ensure default is valid
     if has_default: self.set_prop('default', default)
     if order is not None: self.set_prop('order', order)
-    if doc is not None: self.set_prop('doc', doc)
 
   # read-only properties
   default = property(lambda self: self.get_prop('default'))
   has_default = property(lambda self: self._has_default)
   order = property(lambda self: self.get_prop('order'))
-  doc = property(lambda self: self.get_prop('doc'))
   props = property(lambda self: self._props)
 
   # Read-only property dict. Non-reserved properties
@@ -414,7 +412,7 @@ class FixedSchema(NamedSchema):
     return self.props == that.props
 
 class EnumSchema(NamedSchema):
-  def __init__(self, name, namespace, symbols, names=None, doc=None, other_props=None):
+  def __init__(self, name, namespace, symbols, names=None, other_props=None):
     # Ensure valid ctor args
     if not isinstance(symbols, list):
       fail_msg = 'Enum Schema requires a JSON array for the symbols property.'
@@ -431,11 +429,9 @@ class EnumSchema(NamedSchema):
 
     # Add class members
     self.set_prop('symbols', symbols)
-    if doc is not None: self.set_prop('doc', doc)
 
   # read-only properties
   symbols = property(lambda self: self.get_prop('symbols'))
-  doc = property(lambda self: self.get_prop('doc'))
 
   def to_json(self, names):
     if self.fullname in names.names:
@@ -588,9 +584,8 @@ class RecordSchema(NamedSchema):
           default = field.get('default')
 
         order = field.get('order')
-        doc = field.get('doc')
         other_props = get_other_props(field, FIELD_RESERVED_PROPS)
-        new_field = Field(type, name, has_default, default, order, names, doc,
+        new_field = Field(type, name, has_default, default, order, names,
                          other_props)
         # make sure field name has not been used yet
         if new_field.name in field_names:
@@ -603,7 +598,7 @@ class RecordSchema(NamedSchema):
     return field_objects
 
   def __init__(self, name, namespace, fields, names=None, schema_type='record',
-               doc=None, other_props=None):
+               other_props=None):
     # Ensure valid ctor args
     if fields is None:
       fail_msg = 'Record schema requires a non-empty fields property.'
@@ -627,14 +622,12 @@ class RecordSchema(NamedSchema):
     # Add class members
     field_objects = RecordSchema.make_field_objects(fields, names)
     self.set_prop('fields', field_objects)
-    if doc is not None: self.set_prop('doc', doc)
 
     if schema_type == 'record':
       names.default_namespace = old_default
 
   # read-only properties
   fields = property(lambda self: self.get_prop('fields'))
-  doc = property(lambda self: self.get_prop('doc'))
 
   @property
   def fields_dict(self):
@@ -697,12 +690,10 @@ def make_avsc_object(json_data, names=None):
         return FixedSchema(name, namespace, size, names, other_props)
       elif type == 'enum':
         symbols = json_data.get('symbols')
-        doc = json_data.get('doc')
-        return EnumSchema(name, namespace, symbols, names, doc, other_props)
+        return EnumSchema(name, namespace, symbols, names, other_props)
       elif type in ['record', 'error']:
         fields = json_data.get('fields')
-        doc = json_data.get('doc')
-        return RecordSchema(name, namespace, fields, names, type, doc, other_props)
+        return RecordSchema(name, namespace, fields, names, type, other_props)
       else:
         raise SchemaParseException('Unknown Named Type: %s' % type)
     elif type in VALID_TYPES:

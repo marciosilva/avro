@@ -254,20 +254,6 @@ RECORD_EXAMPLES = [
     """, False),
 ]
 
-DOC_EXAMPLES = [
-  ExampleSchema("""\
-    {"type": "record",
-     "name": "TestDoc",
-     "doc":  "Doc string",
-     "fields": [{"name": "name", "type": "string", 
-                 "doc" : "Doc String"}]}
-    """, True),
-  ExampleSchema("""\
-    {"type": "enum", "name": "Test", "symbols": ["A", "B"],
-     "doc": "Doc String"}
-    """, True),
-]
-
 OTHER_PROP_EXAMPLES = [
   ExampleSchema("""\
     {"type": "record",
@@ -425,19 +411,6 @@ class TestSchema(unittest.TestCase):
     # name, namespace, default namespace specified
     fullname = schema.Name('a', 'o.a.a', 'o.a.h').fullname
     self.assertEqual(fullname, 'o.a.a.a')
-
-  def test_doc_attributes(self):
-    print_test_name('TEST DOC ATTRIBUTES')
-    correct = 0
-    for example in DOC_EXAMPLES:
-      original_schema = schema.parse(example.schema_string)
-      if original_schema.doc is not None:
-        correct += 1
-      if original_schema.type == 'record':
-        for f in original_schema.fields:
-          if f.doc is None:
-            self.fail("Failed to preserve 'doc' in fields: " + example.schema_string)
-    self.assertEqual(correct,len(DOC_EXAMPLES))
 
   def test_other_attributes(self):
     print_test_name('TEST OTHER ATTRIBUTES')
