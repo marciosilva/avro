@@ -20,8 +20,10 @@
 #define avro_NodeImpl_hh__
 
 #include <limits>
+#include <set>
 #include <boost/weak_ptr.hpp>
 
+#include "Config.hh"
 #include "Node.hh"
 #include "NodeConcepts.hh"
 
@@ -62,6 +64,13 @@ class NodeImpl : public Node
         sizeAttribute_(size)
     { }
 
+    void swap(NodeImpl& impl) {
+        std::swap(nameAttribute_, impl.nameAttribute_);
+        std::swap(leafAttributes_, impl.leafAttributes_);
+        std::swap(leafNameAttributes_, impl.leafNameAttributes_);
+        std::swap(sizeAttribute_, impl.sizeAttribute_);
+        std::swap(nameIndex_, impl.nameIndex_);
+    }
     bool hasName() const {
         return NameConcept::hasAttribute;
     }
@@ -151,7 +160,7 @@ typedef NodeImpl< NoName,  MultiLeaves, NoLeafNames,  NoSize  > NodeImplMap;
 typedef NodeImpl< NoName,  MultiLeaves, NoLeafNames,  NoSize  > NodeImplUnion;
 typedef NodeImpl< HasName, NoLeaves,    NoLeafNames,  HasSize > NodeImplFixed;
 
-class NodePrimitive : public NodeImplPrimitive
+class AVRO_DECL NodePrimitive : public NodeImplPrimitive
 {
   public:
 
@@ -168,7 +177,7 @@ class NodePrimitive : public NodeImplPrimitive
     }
 };
 
-class NodeSymbolic : public NodeImplSymbolic
+class AVRO_DECL NodeSymbolic : public NodeImplSymbolic
 {
     typedef boost::weak_ptr<Node> NodeWeakPtr;
 
@@ -182,6 +191,9 @@ class NodeSymbolic : public NodeImplSymbolic
         NodeImplSymbolic(AVRO_SYMBOLIC, name, NoLeaves(), NoLeafNames(), NoSize())
     { }
 
+    NodeSymbolic(const HasName &name, const NodePtr n) :
+        NodeImplSymbolic(AVRO_SYMBOLIC, name, NoLeaves(), NoLeafNames(), NoSize()), actualNode_(n)
+    { }
     SchemaResolution resolve(const Node &reader)  const;
 
     void printJson(std::ostream &os, int depth) const;
@@ -212,7 +224,7 @@ class NodeSymbolic : public NodeImplSymbolic
 
 };
 
-class NodeRecord : public NodeImplRecord
+class AVRO_DECL NodeRecord : public NodeImplRecord
 {
   public:
 
@@ -230,6 +242,10 @@ class NodeRecord : public NodeImplRecord
         }
     }
 
+    void swap(NodeRecord& r) {
+        NodeImplRecord::swap(r);
+    }
+
     SchemaResolution resolve(const Node &reader)  const;
 
     void printJson(std::ostream &os, int depth) const;
@@ -243,7 +259,7 @@ class NodeRecord : public NodeImplRecord
     }
 };
 
-class NodeEnum : public NodeImplEnum
+class AVRO_DECL NodeEnum : public NodeImplEnum
 {
   public:
 
@@ -273,7 +289,7 @@ class NodeEnum : public NodeImplEnum
     }
 };
 
-class NodeArray : public NodeImplArray
+class AVRO_DECL NodeArray : public NodeImplArray
 {
   public:
 
@@ -294,7 +310,7 @@ class NodeArray : public NodeImplArray
     }
 };
 
-class NodeMap : public NodeImplMap
+class AVRO_DECL NodeMap : public NodeImplMap
 {
   public:
 
@@ -325,7 +341,7 @@ class NodeMap : public NodeImplMap
     }
 };
 
-class NodeUnion : public NodeImplUnion
+class AVRO_DECL NodeUnion : public NodeImplUnion
 {
   public:
 
@@ -342,11 +358,64 @@ class NodeUnion : public NodeImplUnion
     void printJson(std::ostream &os, int depth) const;
 
     bool isValid() const {
-        return (leafAttributes_.size() >= 1);
+        std::set<std::string> seen;
+        if (leafAttributes_.size() >= 1) {
+            for (size_t i = 0; i < leafAttributes_.size(); ++i) {
+                std::string name;
+                const NodePtr& n = leafAttributes_.get(i);
+                switch (n->type()) {
+                case AVRO_STRING:
+                    name = "string";
+                    break;
+                case AVRO_BYTES:
+                    name = "bytes";
+                    break;
+                case AVRO_INT:
+                    name = "int";
+                    break;
+                case AVRO_LONG:
+                    name = "long";
+                    break;
+                case AVRO_FLOAT:
+                    name = "float";
+                    break;
+                case AVRO_DOUBLE:
+                    name = "double";
+                    break;
+                case AVRO_BOOL:
+                    name = "bool";
+                    break;
+                case AVRO_NULL:
+                    name = "null";
+                    break;
+                case AVRO_ARRAY:
+                    name = "array";
+                    break;
+                case AVRO_MAP:
+                    name = "map";
+                    break;
+                case AVRO_RECORD:
+                case AVRO_ENUM:
+                case AVRO_UNION:
+                case AVRO_FIXED:
+                case AVRO_SYMBOLIC:
+                    name = n->name();
+                    break;
+                default:
+                    return false;
+                }
+                if (seen.find(name) != seen.end()) {
+                    return false;
+                }
+                seen.insert(name);
+            }
+            return true;
+        }
+        return false;
     }
 };
 
-class NodeFixed : public NodeImplFixed
+class AVRO_DECL NodeFixed : public NodeImplFixed
 {
   public:
 
