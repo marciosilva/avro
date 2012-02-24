@@ -362,6 +362,53 @@ class BinaryEncoder(object):
     """
     self.write(STRUCT_CRC32.pack(crc32(bytes) & 0xffffffff));
 
+
+class GenericContainer(object):
+  """ A Generic conatiner of other data """
+
+  def __init__(self, schema):
+    self._schema = schema
+
+  schema = property(lambda self: self._schema, doc="the schema for this instance")
+
+class GenericRecord(dict, GenericContainer):
+  """
+  A Generic record instance, fields are accessed as dictionary properties.
+  """
+
+  def __init__(self, schema):
+    GenericContainer.__init__(self, schema)
+
+  def __setitem__(self, key, value):
+    if not key in self.schema.fields_dict:
+      fail_msg = 'Field "%s" not in schema %s' % (key, self.schema)
+      raise schema.AvroException(fail_msg)
+    super(GenericRecord, self).__setitem__(key, value)
+
+class EnumSymbol(str, GenericContainer):
+  """ An enum symbol value """
+
+  def __init__(self, symbol, enum_schema):
+    GenericContainer.__init__(self, enum_schema)
+
+  def __new__(cls, symbol, enum_schema):
+    if symbol not in enum_schema.symbols:
+      fail_msg = "Symbol '%s' not in enum symbols: %s" % (symbol,
+                                                          enum_schema.symbols)
+      raise schema.AvroException(fail_msg)
+    return str.__new__(cls, symbol)
+
+class FixedRecord(str, GenericContainer):
+  """ A Fixed record value """
+
+  def __init__(self, value, schema):
+    GenericContainer.__init__(self, schema)
+
+  def __new__(cls, value, schema):
+    if len(value) != schema.size:
+      raise AvroTypeException(schema, value)
+    return str.__new__(cls, value)
+
 #
 # DatumReader/Writer
 #
@@ -530,7 +577,8 @@ class DatumReader(object):
     Fixed instances are encoded using the number of bytes declared
     in the schema.
     """
-    return decoder.read(writers_schema.size)
+    value = decoder.read(writers_schema.size)
+    return FixedRecord(value, readers_schema)
 
   def skip_fixed(self, writers_schema, decoder):
     return decoder.skip(writers_schema.size)
@@ -553,7 +601,7 @@ class DatumReader(object):
       fail_msg = "Symbol %s not present in Reader's Schema" % read_symbol
       raise SchemaResolutionException(fail_msg, writers_schema, readers_schema)
 
-    return read_symbol
+    return EnumSymbol(read_symbol, readers_schema)
 
   def skip_enum(self, writers_schema, decoder):
     return decoder.skip_int()
@@ -683,7 +731,7 @@ class DatumReader(object):
     """
     # schema resolution
     readers_fields_dict = readers_schema.fields_dict
-    read_record = {}
+    read_record = GenericRecord(readers_schema)
     for field in writers_schema.fields:
       readers_field = readers_fields_dict.get(field.name)
       if readers_field is not None:

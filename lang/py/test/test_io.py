@@ -324,6 +324,24 @@ class TestIO(unittest.TestCase):
     print 'Datum Read: %s' % datum_read
     self.assertEquals(datum_to_read, datum_read)
 
+  def test_schema_retrieval(self):
+    print_test_name('TEST SCHEMA RETRIEVAL')
+    correct = 0
+    expected = 0
+    for example_schema, datum in SCHEMAS_TO_VALIDATE:
+      writers_schema = schema.parse(example_schema)
+      if hasattr(writers_schema, 'name'):
+        expected += 1
+        writer, encoder, datum_writer = write_datum(datum, writers_schema)
+        datum_read = read_datum(writer, writers_schema, writers_schema)
+        datum_schema = getattr(datum_read, 'schema', None)
+        print 'Schema written: %s  Schema retrieved: %s' % (example_schema,
+                                                            datum_schema)
+        if datum_schema != None:
+          if writers_schema == datum_schema:
+            correct += 1
+    self.assertEquals(correct, expected)
+
   def test_type_exception(self):
     print_test_name('TEST TYPE EXCEPTION')
     writers_schema = schema.parse("""\
